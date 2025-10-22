@@ -1,29 +1,173 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookOpen, Clock, Users, Award, CheckCircle2, Play, Bookmark } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 const CourseDetail = () => {
   const { id } = useParams();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  const [course, setCourse] = useState<any>(null);
+  const [episodes, setEpisodes] = useState<any[]>([]);
+  const [enrollment, setEnrollment] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [purchasing, setPurchasing] = useState(false);
 
-  const episodes = [
-    { id: 1, title: "Pengenalan Web Development", duration: "15:30", completed: true },
-    { id: 2, title: "HTML & CSS Fundamentals", duration: "25:45", completed: true },
-    { id: 3, title: "JavaScript Basics", duration: "30:20", completed: false },
-    { id: 4, title: "React Introduction", duration: "35:15", completed: false },
-    { id: 5, title: "State Management", duration: "28:40", completed: false }
-  ];
+  useEffect(() => {
+    if (id) {
+      fetchCourseData();
+    }
+  }, [id, user]);
 
-  const learningPoints = [
-    "Menguasai HTML, CSS, dan JavaScript",
-    "Membangun aplikasi web modern dengan React",
-    "Memahami konsep responsive design",
-    "Bekerja dengan API dan data",
-    "Deploy aplikasi ke production"
-  ];
+  const fetchCourseData = async () => {
+    try {
+      // Fetch course details
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select(`
+          *,
+          profiles:instructor_id (full_name, avatar_url)
+        `)
+        .eq('id', id)
+        .single();
+
+      if (courseError) throw courseError;
+      setCourse(courseData);
+
+      // Fetch episodes
+      const { data: episodesData, error: episodesError } = await supabase
+        .from('course_episodes')
+        .select('*')
+        .eq('course_id', id)
+        .order('episode_number', { ascending: true });
+
+      if (episodesError) throw episodesError;
+      setEpisodes(episodesData || []);
+
+      // Check enrollment if user is logged in
+      if (user) {
+        const { data: enrollmentData } = await supabase
+          .from('enrollments')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('course_id', id)
+          .maybeSingle();
+
+        setEnrollment(enrollmentData);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Gagal memuat data kursus",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePurchase = async () => {
+    if (!user) {
+      toast({
+        title: "Login Required",
+        description: "Silakan login terlebih dahulu untuk membeli kursus",
+      });
+      navigate('/auth');
+      return;
+    }
+
+    if (enrollment) {
+      toast({
+        title: "Sudah Terdaftar",
+        description: "Anda sudah terdaftar di kursus ini",
+      });
+      return;
+    }
+
+    setPurchasing(true);
+
+    try {
+      if (course.is_free) {
+        // Free course - create enrollment directly
+        const { error } = await supabase
+          .from('enrollments')
+          .insert({
+            user_id: user.id,
+            course_id: id,
+            progress: 0
+          });
+
+        if (error) throw error;
+
+        toast({
+          title: "Berhasil!",
+          description: "Anda berhasil mendaftar di kursus ini",
+        });
+        
+        fetchCourseData();
+      } else {
+        // Paid course - create Midtrans payment
+        const { data, error } = await supabase.functions.invoke('create-payment', {
+          body: {
+            courseId: id,
+            amount: Number(course.price)
+          }
+        });
+
+        if (error) throw error;
+
+        if (data.payment_url) {
+          window.open(data.payment_url, '_blank');
+          toast({
+            title: "Redirect ke Pembayaran",
+            description: "Silakan selesaikan pembayaran di tab baru",
+          });
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Gagal memproses pembayaran",
+        variant: "destructive",
+      });
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-secondary/30">
+        <Navbar />
+        <div className="container mx-auto px-4 py-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Memuat kursus...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!course) {
+    return (
+      <div className="min-h-screen bg-secondary/30">
+        <Navbar />
+        <div className="container mx-auto px-4 py-8 text-center">
+          <p className="text-muted-foreground">Kursus tidak ditemukan</p>
+        </div>
+      </div>
+    );
+  }
+
+  const learningPoints = course.description?.split('\n').filter((line: string) => line.trim()) || [];
 
   return (
     <div className="min-h-screen bg-secondary/30">
@@ -35,11 +179,15 @@ const CourseDetail = () => {
           <div className="lg:col-span-2 space-y-6">
             {/* Hero */}
             <div className="relative h-96 rounded-xl overflow-hidden bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Play className="h-24 w-24 text-white/80" />
+              {course.thumbnail_url ? (
+                <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+              ) : (
+                <Play className="h-24 w-24 text-white/80" />
+              )}
               <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/60 to-transparent text-white">
-                <Badge className="mb-2">Intermediate</Badge>
-                <h1 className="text-3xl font-bold mb-2">Web Development Master</h1>
-                <p className="text-white/90">Oleh John Doe</p>
+                <Badge className="mb-2">{course.level || 'Beginner'}</Badge>
+                <h1 className="text-3xl font-bold mb-2">{course.title}</h1>
+                <p className="text-white/90">Oleh {course.profiles?.full_name || 'Instruktur'}</p>
               </div>
             </div>
 
@@ -57,29 +205,30 @@ const CourseDetail = () => {
                     <CardTitle>Tentang Kursus</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground mb-4">
-                      Pelajari web development dari dasar hingga mahir. Kursus ini akan mengajarkan Anda HTML, CSS, JavaScript, dan React untuk membangun aplikasi web modern yang responsif dan interaktif.
-                    </p>
-                    <p className="text-muted-foreground">
-                      Dengan pendekatan hands-on dan project-based, Anda akan membangun portfolio yang kuat dan siap untuk karir sebagai web developer profesional.
+                    <p className="text-muted-foreground whitespace-pre-wrap">
+                      {course.description || 'Tidak ada deskripsi'}
                     </p>
                   </CardContent>
                 </Card>
 
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Apa yang Akan Anda Pelajari</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-3">
-                      {learningPoints.map((point, index) => (
-                        <li key={index} className="flex items-start gap-3">
-                          <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
-                          <span>{point}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
+                {learningPoints.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Apa yang Akan Anda Pelajari</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-3">
+                        {learningPoints.slice(0, 5).map((point, index) => (
+                          <li key={index} className="flex items-start gap-3">
+                            <CheckCircle2 className="h-5 w-5 text-success flex-shrink-0 mt-0.5" />
+                            <span>{point}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
                 </Card>
               </TabsContent>
 
@@ -126,20 +275,23 @@ const CourseDetail = () => {
                     <CardTitle>Instruktur</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-start gap-4">
-                      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-accent" />
-                      <div>
-                        <h3 className="text-xl font-bold mb-2">John Doe</h3>
-                        <p className="text-muted-foreground mb-4">
-                          Senior Web Developer dengan 10+ tahun pengalaman. Telah mengajar lebih dari 50,000 siswa di seluruh dunia.
-                        </p>
-                        <div className="flex gap-4 text-sm text-muted-foreground">
-                          <span>⭐ 4.9 Rating</span>
-                          <span>👥 50K+ Siswa</span>
-                          <span>📚 15 Kursus</span>
+                      <div className="flex items-start gap-4">
+                        {course.profiles?.avatar_url ? (
+                          <img 
+                            src={course.profiles.avatar_url} 
+                            alt={course.profiles.full_name}
+                            className="w-20 h-20 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-accent" />
+                        )}
+                        <div>
+                          <h3 className="text-xl font-bold mb-2">{course.profiles?.full_name || 'Instruktur'}</h3>
+                          <p className="text-muted-foreground mb-4">
+                            Instruktur berpengalaman yang siap membimbing Anda dalam perjalanan pembelajaran.
+                          </p>
                         </div>
                       </div>
-                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -151,32 +303,36 @@ const CourseDetail = () => {
             <Card className="sticky top-24">
               <CardContent className="p-6 space-y-6">
                 <div className="text-center">
-                  <p className="text-4xl font-bold text-primary mb-2">Rp 299.000</p>
-                  <p className="text-sm text-muted-foreground line-through">Rp 499.000</p>
+                  <p className="text-4xl font-bold text-primary mb-2">
+                    {course.is_free ? 'Gratis' : `Rp ${Number(course.price).toLocaleString('id-ID')}`}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Button className="w-full" size="lg">
-                    Beli Sekarang
-                  </Button>
-                  <Button className="w-full" variant="outline" size="lg">
-                    <Bookmark className="h-4 w-4 mr-2" />
-                    Simpan
-                  </Button>
+                  {enrollment ? (
+                    <Button className="w-full" size="lg" disabled>
+                      Sudah Terdaftar
+                    </Button>
+                  ) : (
+                    <Button 
+                      className="w-full" 
+                      size="lg"
+                      onClick={handlePurchase}
+                      disabled={purchasing}
+                    >
+                      {purchasing ? 'Memproses...' : course.is_free ? 'Daftar Sekarang' : 'Beli Sekarang'}
+                    </Button>
+                  )}
                 </div>
 
                 <div className="space-y-3 pt-4 border-t">
                   <div className="flex items-center gap-3">
-                    <Users className="h-5 w-5 text-muted-foreground" />
-                    <span className="text-sm">2,500+ siswa terdaftar</span>
-                  </div>
-                  <div className="flex items-center gap-3">
                     <BookOpen className="h-5 w-5 text-muted-foreground" />
-                    <span className="text-sm">5 modul pembelajaran</span>
+                    <span className="text-sm">{episodes.length} episode</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Clock className="h-5 w-5 text-muted-foreground" />
-                    <span className="text-sm">12 jam video</span>
+                    <span className="text-sm">{course.duration_hours || 0} jam video</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Award className="h-5 w-5 text-muted-foreground" />
