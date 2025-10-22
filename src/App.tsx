@@ -11,6 +11,8 @@ import Dashboard from "./pages/Dashboard";
 import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
 import Admin from "./pages/Admin";
+import CourseManagement from "./pages/CourseManagement";
+import EpisodeManagement from "./pages/EpisodeManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +42,22 @@ const App = () => (
               element={
                 <ProtectedRoute requireAdmin>
                   <Admin />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/courses" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <CourseManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/courses/:courseId/episodes" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <EpisodeManagement />
                 </ProtectedRoute>
               } 
             />

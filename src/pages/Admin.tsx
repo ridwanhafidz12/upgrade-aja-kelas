@@ -2,19 +2,80 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { BookOpen, Users, DollarSign, Award, Plus } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
+import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Admin = () => {
-  const stats = [
-    { label: "Total Kursus", value: "24", icon: BookOpen, change: "+3 bulan ini" },
-    { label: "Total Siswa", value: "1,234", icon: Users, change: "+180 bulan ini" },
-    { label: "Pendapatan", value: "Rp 45.5M", icon: DollarSign, change: "+12% bulan ini" },
-    { label: "Sertifikat", value: "856", icon: Award, change: "+95 bulan ini" }
-  ];
+  const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    totalCourses: 0,
+    totalStudents: 0,
+    totalRevenue: 0,
+    totalCertificates: 0
+  });
+  const [recentCourses, setRecentCourses] = useState<any[]>([]);
 
-  const recentCourses = [
-    { title: "Web Development Master", students: 234, status: "Aktif", price: "Rp 299K" },
-    { title: "UI/UX Design Fundamental", students: 189, status: "Aktif", price: "Rp 249K" },
-    { title: "Digital Marketing Pro", students: 312, status: "Aktif", price: "Gratis" }
+  useEffect(() => {
+    fetchStats();
+    fetchRecentCourses();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const { data: courses } = await supabase.from("courses").select("id", { count: "exact" });
+      const { data: enrollments } = await supabase.from("enrollments").select("id", { count: "exact" });
+      const { data: payments } = await supabase.from("payments").select("amount").eq("status", "settlement");
+      const { data: certificates } = await supabase.from("certificates").select("id", { count: "exact" });
+
+      const totalRevenue = payments?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+
+      setStats({
+        totalCourses: courses?.length || 0,
+        totalStudents: enrollments?.length || 0,
+        totalRevenue: totalRevenue,
+        totalCertificates: certificates?.length || 0
+      });
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    }
+  };
+
+  const fetchRecentCourses = async () => {
+    try {
+      const { data } = await supabase
+        .from("courses")
+        .select("id, title, price, is_free, status")
+        .order("created_at", { ascending: false })
+        .limit(3);
+
+      if (data) {
+        const coursesWithEnrollments = await Promise.all(
+          data.map(async (course) => {
+            const { count } = await supabase
+              .from("enrollments")
+              .select("*", { count: "exact", head: true })
+              .eq("course_id", course.id);
+            
+            return {
+              ...course,
+              students: count || 0,
+              displayPrice: course.is_free ? "Gratis" : `Rp ${course.price.toLocaleString('id-ID')}`
+            };
+          })
+        );
+        setRecentCourses(coursesWithEnrollments);
+      }
+    } catch (error) {
+      console.error("Error fetching recent courses:", error);
+    }
+  };
+
+  const statsDisplay = [
+    { label: "Total Kursus", value: stats.totalCourses.toString(), icon: BookOpen, change: "Dari database" },
+    { label: "Total Siswa", value: stats.totalStudents.toString(), icon: Users, change: "Total pendaftaran" },
+    { label: "Pendapatan", value: `Rp ${stats.totalRevenue.toLocaleString('id-ID')}`, icon: DollarSign, change: "Total lunas" },
+    { label: "Sertifikat", value: stats.totalCertificates.toString(), icon: Award, change: "Total diterbitkan" }
   ];
 
   return (
@@ -27,15 +88,15 @@ const Admin = () => {
             <h1 className="text-4xl font-bold mb-2">Dashboard Admin</h1>
             <p className="text-muted-foreground">Kelola kursus dan platform Upgradeaja</p>
           </div>
-          <Button size="lg" className="gap-2">
+          <Button size="lg" className="gap-2" onClick={() => navigate("/admin/courses")}>
             <Plus className="h-5 w-5" />
-            Tambah Kursus
+            Kelola Kursus
           </Button>
         </div>
 
         {/* Stats */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat, index) => (
+          {statsDisplay.map((stat, index) => (
             <Card key={index}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -67,15 +128,19 @@ const Admin = () => {
                       <p className="text-sm text-muted-foreground">{course.students} siswa</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-primary mb-1">{course.price}</p>
-                      <span className="text-xs px-2 py-1 bg-success/10 text-success rounded-full">
+                      <p className="font-bold text-primary mb-1">{course.displayPrice}</p>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        course.status === 'published' ? 'bg-success/10 text-success' :
+                        course.status === 'draft' ? 'bg-warning/10 text-warning' :
+                        'bg-muted text-muted-foreground'
+                      }`}>
                         {course.status}
                       </span>
                     </div>
                   </div>
                 ))}
               </div>
-              <Button variant="outline" className="w-full mt-4">
+              <Button variant="outline" className="w-full mt-4" onClick={() => navigate("/admin/courses")}>
                 Lihat Semua Kursus
               </Button>
             </CardContent>
@@ -88,25 +153,21 @@ const Admin = () => {
               <CardDescription>Kelola platform dengan mudah</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button className="w-full justify-start" variant="outline">
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => navigate("/admin/courses")}
+              >
                 <Plus className="mr-2 h-4 w-4" />
-                Tambah Kursus Baru
+                Kelola Kursus
               </Button>
-              <Button className="w-full justify-start" variant="outline">
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => navigate("/admin/courses")}
+              >
                 <BookOpen className="mr-2 h-4 w-4" />
                 Kelola Episode Video
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <DollarSign className="mr-2 h-4 w-4" />
-                Atur Harga Kursus
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <Award className="mr-2 h-4 w-4" />
-                Generate Sertifikat
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <Users className="mr-2 h-4 w-4" />
-                Kelola User
               </Button>
             </CardContent>
           </Card>
