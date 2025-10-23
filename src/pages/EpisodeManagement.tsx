@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +15,10 @@ import { toast } from "sonner";
 interface Episode {
   id: string;
   title: string;
-  subtitle?: string;
+  subtitle_id?: string;
+  episode_subtitles?: {
+    name: string;
+  };
   description: string;
   youtube_url: string;
   episode_number: number;
@@ -22,10 +26,16 @@ interface Episode {
   is_preview: boolean;
 }
 
+interface Subtitle {
+  id: string;
+  name: string;
+}
+
 const EpisodeManagement = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
   const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
   const [courseName, setCourseName] = useState("");
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -33,7 +43,7 @@ const EpisodeManagement = () => {
 
   const [formData, setFormData] = useState({
     title: "",
-    subtitle: "",
+    subtitle_id: "",
     description: "",
     youtube_url: "",
     episode_number: 1,
@@ -45,8 +55,23 @@ const EpisodeManagement = () => {
     if (courseId) {
       fetchCourse();
       fetchEpisodes();
+      fetchSubtitles();
     }
   }, [courseId]);
+
+  const fetchSubtitles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("episode_subtitles")
+        .select("*")
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+      setSubtitles(data || []);
+    } catch (error: any) {
+      toast.error("Gagal memuat subtitle");
+    }
+  };
 
   const fetchCourse = async () => {
     try {
@@ -67,7 +92,10 @@ const EpisodeManagement = () => {
     try {
       const { data, error } = await supabase
         .from("course_episodes")
-        .select("*")
+        .select(`
+          *,
+          episode_subtitles:subtitle_id (name)
+        `)
         .eq("course_id", courseId)
         .order("episode_number", { ascending: true });
 
@@ -130,7 +158,7 @@ const EpisodeManagement = () => {
     setEditingEpisode(episode);
     setFormData({
       title: episode.title,
-      subtitle: episode.subtitle || "",
+      subtitle_id: episode.subtitle_id || "",
       description: episode.description || "",
       youtube_url: episode.youtube_url,
       episode_number: episode.episode_number,
@@ -148,7 +176,7 @@ const EpisodeManagement = () => {
     
     setFormData({
       title: "",
-      subtitle: "",
+      subtitle_id: "",
       description: "",
       youtube_url: "",
       episode_number: nextEpisodeNumber,
@@ -217,13 +245,23 @@ const EpisodeManagement = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="subtitle">Sub Judul</Label>
-                  <Input
-                    id="subtitle"
-                    value={formData.subtitle}
-                    onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
-                    placeholder="Sub judul episode (opsional)"
-                  />
+                  <Label htmlFor="subtitle_id">Sub Judul</Label>
+                  <Select
+                    value={formData.subtitle_id}
+                    onValueChange={(value) => setFormData({ ...formData, subtitle_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih subtitle (opsional)..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Tanpa Subtitle</SelectItem>
+                      {subtitles.map((subtitle) => (
+                        <SelectItem key={subtitle.id} value={subtitle.id}>
+                          {subtitle.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
@@ -297,8 +335,8 @@ const EpisodeManagement = () => {
                   <CardTitle className="flex items-center justify-between">
                     <div>
                       <span>Episode {episode.episode_number}: {episode.title}</span>
-                      {episode.subtitle && (
-                        <p className="text-sm font-medium text-muted-foreground mt-1">{episode.subtitle}</p>
+                      {episode.episode_subtitles?.name && (
+                        <p className="text-sm font-medium text-muted-foreground mt-1">{episode.episode_subtitles.name}</p>
                       )}
                     </div>
                     <div className="flex gap-2">

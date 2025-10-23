@@ -49,6 +49,27 @@ export type Database = {
           },
         ]
       }
+      course_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       course_episodes: {
         Row: {
           course_id: string
@@ -58,7 +79,7 @@ export type Database = {
           episode_number: number
           id: string
           is_preview: boolean | null
-          subtitle: string | null
+          subtitle_id: string | null
           title: string
           updated_at: string
           youtube_url: string
@@ -71,7 +92,7 @@ export type Database = {
           episode_number: number
           id?: string
           is_preview?: boolean | null
-          subtitle?: string | null
+          subtitle_id?: string | null
           title: string
           updated_at?: string
           youtube_url: string
@@ -84,7 +105,7 @@ export type Database = {
           episode_number?: number
           id?: string
           is_preview?: boolean | null
-          subtitle?: string | null
+          subtitle_id?: string | null
           title?: string
           updated_at?: string
           youtube_url?: string
@@ -97,11 +118,19 @@ export type Database = {
             referencedRelation: "courses"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "course_episodes_subtitle_id_fkey"
+            columns: ["subtitle_id"]
+            isOneToOne: false
+            referencedRelation: "episode_subtitles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       courses: {
         Row: {
           category: string | null
+          category_id: string | null
           created_at: string
           description: string | null
           duration_hours: number | null
@@ -117,6 +146,7 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          category_id?: string | null
           created_at?: string
           description?: string | null
           duration_hours?: number | null
@@ -132,6 +162,7 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          category_id?: string | null
           created_at?: string
           description?: string | null
           duration_hours?: number | null
@@ -145,7 +176,15 @@ export type Database = {
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "courses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "course_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       enrollments: {
         Row: {
@@ -181,6 +220,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      episode_subtitles: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
       }
       payments: {
         Row: {

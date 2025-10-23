@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Users, DollarSign, Award, Plus } from "lucide-react";
+import { BookOpen, Users, DollarSign, Award, Plus, Tag, FileText } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -164,10 +164,26 @@ const Admin = () => {
               <Button 
                 className="w-full justify-start" 
                 variant="outline"
-                onClick={() => navigate("/admin/courses")}
+                onClick={() => navigate("/admin/categories")}
               >
-                <BookOpen className="mr-2 h-4 w-4" />
-                Kelola Episode Video
+                <Tag className="mr-2 h-4 w-4" />
+                Kelola Kategori
+              </Button>
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => navigate("/admin/subtitles")}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                Kelola Subtitle
+              </Button>
+              <Button 
+                className="w-full justify-start" 
+                variant="outline"
+                onClick={() => navigate("/admin/certificates")}
+              >
+                <Award className="mr-2 h-4 w-4" />
+                Kelola Sertifikat
               </Button>
             </CardContent>
           </Card>

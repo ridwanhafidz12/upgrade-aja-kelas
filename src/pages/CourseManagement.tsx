@@ -20,17 +20,27 @@ interface Course {
   thumbnail_url: string;
   price: number;
   is_free: boolean;
-  category: string;
+  category_id: string;
+  course_categories?: {
+    name: string;
+  };
   level: string;
   duration_hours: number;
   status: string;
 }
 
+interface Category {
+  id: string;
+  name: string;
+}
+
 const CourseManagement = () => {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [uploading, setUploading] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -40,7 +50,7 @@ const CourseManagement = () => {
     thumbnail_url: "",
     price: 0,
     is_free: false,
-    category: "",
+    category_id: "",
     level: "beginner",
     duration_hours: 0,
     status: "draft"
@@ -48,13 +58,31 @@ const CourseManagement = () => {
 
   useEffect(() => {
     fetchCourses();
+    fetchCategories();
   }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("course_categories")
+        .select("*")
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (error: any) {
+      toast.error("Gagal memuat kategori");
+    }
+  };
 
   const fetchCourses = async () => {
     try {
       const { data, error } = await supabase
         .from("courses")
-        .select("*")
+        .select(`
+          *,
+          course_categories:category_id (name)
+        `)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -63,6 +91,35 @@ const CourseManagement = () => {
       toast.error("Gagal memuat kursus: " + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('course-thumbnails')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('course-thumbnails')
+        .getPublicUrl(filePath);
+
+      setFormData({ ...formData, thumbnail_url: publicUrl });
+      toast.success("Thumbnail berhasil diupload!");
+    } catch (error: any) {
+      toast.error("Gagal upload thumbnail: " + error.message);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -120,7 +177,7 @@ const CourseManagement = () => {
       thumbnail_url: course.thumbnail_url || "",
       price: course.price,
       is_free: course.is_free,
-      category: course.category || "",
+      category_id: course.category_id || "",
       level: course.level,
       duration_hours: course.duration_hours || 0,
       status: course.status
@@ -136,7 +193,7 @@ const CourseManagement = () => {
       thumbnail_url: "",
       price: 0,
       is_free: false,
-      category: "",
+      category_id: "",
       level: "beginner",
       duration_hours: 0,
       status: "draft"
@@ -193,23 +250,52 @@ const CourseManagement = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="thumbnail">URL Thumbnail</Label>
+                  <Label htmlFor="thumbnail">Thumbnail</Label>
                   <Input
                     id="thumbnail"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    disabled={uploading}
+                  />
+                  {formData.thumbnail_url && (
+                    <div className="mt-2">
+                      <img 
+                        src={formData.thumbnail_url} 
+                        alt="Preview" 
+                        className="w-32 h-32 object-cover rounded"
+                      />
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {uploading ? "Uploading..." : "Upload gambar atau masukkan URL di bawah"}
+                  </p>
+                  <Input
                     value={formData.thumbnail_url}
                     onChange={(e) => setFormData({ ...formData, thumbnail_url: e.target.value })}
-                    placeholder="https://..."
+                    placeholder="Atau masukkan URL..."
+                    className="mt-2"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="category">Kategori</Label>
-                    <Input
-                      id="category"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    />
+                    <Select
+                      value={formData.category_id}
+                      onValueChange={(value) => setFormData({ ...formData, category_id: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih kategori..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category.id} value={category.id}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div>

@@ -1,150 +1,155 @@
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { BookOpen, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Clock, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
+
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  thumbnail_url: string;
+  price: number;
+  is_free: boolean;
+  level: string;
+  duration_hours: number;
+  course_categories?: {
+    name: string;
+  };
+  profiles?: {
+    full_name: string;
+  };
+}
+
+interface Category {
+  id: string;
+  name: string;
+}
 
 const Courses = () => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeCategory, setActiveCategory] = useState("Semua");
-  const [courses, setCourses] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-
-  const categories = ["Semua", "Web Development", "Design", "Marketing", "AI & Data", "Mobile"];
 
   useEffect(() => {
-    fetchCourses();
+    fetchData();
   }, []);
 
-  const fetchCourses = async () => {
+  const fetchData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('courses')
-        .select(`
-          *,
-          profiles:instructor_id (full_name)
-        `)
-        .eq('status', 'published')
-        .order('created_at', { ascending: false });
+      const [coursesResult, categoriesResult] = await Promise.all([
+        supabase
+          .from("courses")
+          .select(`
+            *,
+            course_categories:category_id (name)
+          `)
+          .eq("status", "published")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("course_categories")
+          .select("*")
+          .order("name", { ascending: true })
+      ]);
 
-      if (error) throw error;
-      setCourses(data || []);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Gagal memuat kursus",
-        variant: "destructive",
-      });
+      if (coursesResult.error) throw coursesResult.error;
+      if (categoriesResult.error) throw categoriesResult.error;
+
+      setCourses(coursesResult.data || []);
+      setCategories(categoriesResult.data || []);
+    } catch (error: any) {
+      toast.error("Gagal memuat data: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredCourses = courses.filter(course => {
-    const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         course.profiles?.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = activeCategory === "Semua" || course.category === activeCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const filteredCourses = selectedCategory === "all"
+    ? courses
+    : courses.filter(course => course.course_categories?.name.toLowerCase() === selectedCategory.toLowerCase());
 
   return (
     <div className="min-h-screen bg-secondary/30">
       <Navbar />
 
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Katalog Kursus</h1>
           <p className="text-muted-foreground">Temukan kursus terbaik untuk meningkatkan skill digital Anda</p>
         </div>
 
-        {/* Search and Filter */}
-        <div className="mb-8 space-y-4">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder="Cari kursus atau instruktur..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          {/* Categories */}
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <Button
-                key={category}
-                variant={activeCategory === category ? "default" : "outline"}
-                onClick={() => setActiveCategory(category)}
-                className="rounded-full"
-              >
-                {category}
-              </Button>
-            ))}
-          </div>
+        <div className="flex flex-wrap gap-2 mb-8">
+          <Button
+            variant={selectedCategory === "all" ? "default" : "outline"}
+            onClick={() => setSelectedCategory("all")}
+          >
+            Semua
+          </Button>
+          {categories.map((category) => (
+            <Button
+              key={category.id}
+              variant={selectedCategory === category.name.toLowerCase() ? "default" : "outline"}
+              onClick={() => setSelectedCategory(category.name.toLowerCase())}
+            >
+              {category.name}
+            </Button>
+          ))}
         </div>
 
-        {/* Results Count */}
-        <div className="mb-6">
-          <p className="text-muted-foreground">
-            Menampilkan {filteredCourses.length} kursus
-          </p>
-        </div>
-
-        {/* Courses Grid */}
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Memuat kursus...</p>
+          <div className="text-center py-12">Loading...</div>
+        ) : filteredCourses.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            Belum ada kursus tersedia
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCourses.map((course) => (
-              <Link key={course.id} to={`/courses/${course.id}`}>
-                <Card className="h-full overflow-hidden hover:shadow-xl transition-all group cursor-pointer">
-                  <div className="h-48 bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                    {course.thumbnail_url ? (
-                      <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <BookOpen className="h-20 w-20 text-white/80" />
+              <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                {course.thumbnail_url && (
+                  <img
+                    src={course.thumbnail_url}
+                    alt={course.title}
+                    className="w-full h-48 object-cover"
+                  />
+                )}
+                <CardHeader>
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant="secondary">{course.course_categories?.name || "Umum"}</Badge>
+                    <Badge variant="outline">{course.level}</Badge>
+                  </div>
+                  <CardTitle className="line-clamp-2">{course.title}</CardTitle>
+                  <CardDescription className="line-clamp-2">{course.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      {course.duration_hours} jam
+                    </div>
+                    {course.profiles?.full_name && (
+                      <div className="flex items-center gap-1">
+                        <Users className="h-4 w-4" />
+                        {course.profiles.full_name}
+                      </div>
                     )}
                   </div>
-                  <CardHeader>
-                    <div className="flex justify-between items-start mb-2">
-                      <Badge variant="secondary">{course.level || 'Beginner'}</Badge>
-                      <Badge variant="outline">{course.category || 'General'}</Badge>
-                    </div>
-                    <CardTitle className="group-hover:text-primary transition-colors">{course.title}</CardTitle>
-                    <CardDescription>Oleh {course.profiles?.full_name || 'Instruktur'}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          {course.duration_hours ? `${course.duration_hours} jam` : 'Durasi variatif'}
-                        </p>
-                      </div>
-                      <p className="text-xl font-bold text-primary">
-                        {course.is_free ? 'Gratis' : `Rp ${Number(course.price).toLocaleString('id-ID')}`}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                  <div className="text-2xl font-bold text-primary">
+                    {course.is_free ? "Gratis" : `Rp ${course.price.toLocaleString('id-ID')}`}
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button asChild className="w-full">
+                    <Link to={`/courses/${course.id}`}>Lihat Detail</Link>
+                  </Button>
+                </CardFooter>
+              </Card>
             ))}
-          </div>
-        )}
-
-        {filteredCourses.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground text-lg">Tidak ada kursus yang ditemukan</p>
           </div>
         )}
       </div>

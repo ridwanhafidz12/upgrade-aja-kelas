@@ -13,6 +13,9 @@ import CourseDetail from "./pages/CourseDetail";
 import Admin from "./pages/Admin";
 import CourseManagement from "./pages/CourseManagement";
 import EpisodeManagement from "./pages/EpisodeManagement";
+import SubtitleManagement from "./pages/SubtitleManagement";
+import CategoryManagement from "./pages/CategoryManagement";
+import CertificateManagement from "./pages/CertificateManagement";
 import AboutUs from "./pages/AboutUs";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
@@ -64,6 +67,30 @@ const App = () => (
               element={
                 <ProtectedRoute requireAdmin>
                   <EpisodeManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/subtitles" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <SubtitleManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/categories" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <CategoryManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/certificates" 
+              element={
+                <ProtectedRoute requireAdmin>
+                  <CertificateManagement />
                 </ProtectedRoute>
               } 
             />
