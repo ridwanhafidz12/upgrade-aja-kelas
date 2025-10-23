@@ -177,6 +177,20 @@ const CourseLearning = () => {
   const handleGenerateCertificate = async () => {
     setGeneratingCertificate(true);
     try {
+      // Check if certificate already exists
+      const { data: existingCert } = await supabase
+        .from('certificates')
+        .select('certificate_number')
+        .eq('user_id', user?.id)
+        .eq('course_id', id)
+        .maybeSingle();
+
+      if (existingCert) {
+        toast.success("Anda sudah memiliki sertifikat untuk kursus ini!");
+        navigate(`/certificate/verify/${existingCert.certificate_number}`);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("generate-certificate", {
         body: { courseId: id }
       });
@@ -185,8 +199,10 @@ const CourseLearning = () => {
       
       toast.success("Sertifikat berhasil dibuat!");
       
-      // Redirect to certificate or dashboard
-      if (data?.certificate?.id) {
+      // Redirect to certificate verification page
+      if (data?.certificate?.certificate_number) {
+        navigate(`/certificate/verify/${data.certificate.certificate_number}`);
+      } else {
         navigate('/dashboard');
       }
     } catch (error: any) {

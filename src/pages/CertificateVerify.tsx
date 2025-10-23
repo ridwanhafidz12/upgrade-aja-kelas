@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Award, CheckCircle2, XCircle, Calendar, User, BookOpen } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Award, CheckCircle2, XCircle, Calendar, User, BookOpen, QrCode } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const CertificateVerify = () => {
@@ -114,10 +115,44 @@ const CertificateVerify = () => {
                   </div>
                 </div>
 
+                {/* QR Code Display */}
+                {certificate.qr_code_url && (
+                  <div className="p-6 bg-muted/50 rounded-lg">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <QrCode className="h-5 w-5 text-primary" />
+                        <p className="text-sm font-medium">Kode Verifikasi QR</p>
+                      </div>
+                      <div className="p-3 bg-white border-2 border-primary rounded-lg">
+                        <img 
+                          src={certificate.qr_code_url} 
+                          alt="QR Code Verifikasi" 
+                          className="w-32 h-32"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground text-center max-w-sm">
+                        Scan QR code ini untuk memverifikasi keaslian sertifikat secara cepat
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="text-center pt-4 border-t">
                   <p className="text-sm text-muted-foreground">
                     Sertifikat ini sah dan dikeluarkan oleh sistem kami.
                   </p>
+                  <div className="flex gap-3 justify-center mt-4">
+                    <Link to="/courses">
+                      <Button variant="outline">
+                        Lihat Kursus Lainnya
+                      </Button>
+                    </Link>
+                    <Link to="/dashboard">
+                      <Button>
+                        Ke Dashboard
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -133,10 +168,15 @@ const CertificateVerify = () => {
                 </p>
               </CardHeader>
               <CardContent>
-                <div className="p-4 bg-destructive/5 rounded-lg text-center">
+                <div className="p-4 bg-destructive/5 rounded-lg text-center space-y-4">
                   <p className="text-sm text-muted-foreground">
                     Pastikan nomor sertifikat yang Anda masukkan benar atau hubungi administrator.
                   </p>
+                  <Link to="/courses">
+                    <Button variant="outline" className="w-full sm:w-auto">
+                      Lihat Kursus Tersedia
+                    </Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>

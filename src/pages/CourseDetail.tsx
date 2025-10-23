@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, Clock, Users, Award, CheckCircle2, Play, Bookmark } from "lucide-react";
+import { BookOpen, Clock, Users, Award, CheckCircle2, Play, Bookmark, BookmarkCheck } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +41,8 @@ const CourseDetail = () => {
   const [enrollment, setEnrollment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [bookmarkId, setBookmarkId] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -126,6 +128,19 @@ const CourseDetail = () => {
           .maybeSingle();
 
         setEnrollment(enrollmentData);
+
+        // Check if bookmarked
+        const { data: bookmarkData } = await supabase
+          .from('bookmarks')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('course_id', id)
+          .maybeSingle();
+
+        if (bookmarkData) {
+          setIsBookmarked(true);
+          setBookmarkId(bookmarkData.id);
+        }
       }
     } catch (error) {
       console.error('Error fetching course:', error);
@@ -136,6 +151,59 @@ const CourseDetail = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleBookmark = async () => {
+    if (!user) {
+      toast({
+        title: "Login Required",
+        description: "Silakan login terlebih dahulu",
+      });
+      navigate('/auth');
+      return;
+    }
+
+    try {
+      if (isBookmarked && bookmarkId) {
+        // Remove bookmark
+        const { error } = await supabase
+          .from('bookmarks')
+          .delete()
+          .eq('id', bookmarkId);
+
+        if (error) throw error;
+        setIsBookmarked(false);
+        setBookmarkId(null);
+        toast({
+          title: "Bookmark dihapus",
+          description: "Kursus telah dihapus dari bookmark",
+        });
+      } else {
+        // Add bookmark
+        const { data, error } = await supabase
+          .from('bookmarks')
+          .insert({
+            user_id: user.id,
+            course_id: id
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        setIsBookmarked(true);
+        setBookmarkId(data.id);
+        toast({
+          title: "Bookmark ditambahkan",
+          description: "Kursus telah ditambahkan ke bookmark",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Gagal mengubah bookmark",
+        variant: "destructive",
+      });
     }
   };
 
@@ -399,6 +467,25 @@ const CourseDetail = () => {
                       {purchasing ? 'Memproses...' : course.is_free ? 'Daftar Sekarang' : 'Beli Sekarang'}
                     </Button>
                   )}
+                  
+                  <Button 
+                    className="w-full gap-2" 
+                    size="lg"
+                    variant="outline"
+                    onClick={toggleBookmark}
+                  >
+                    {isBookmarked ? (
+                      <>
+                        <BookmarkCheck className="h-5 w-5" />
+                        Hapus Bookmark
+                      </>
+                    ) : (
+                      <>
+                        <Bookmark className="h-5 w-5" />
+                        Simpan Bookmark
+                      </>
+                    )}
+                  </Button>
                 </div>
 
                 <div className="space-y-3 pt-4 border-t">

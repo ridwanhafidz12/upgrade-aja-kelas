@@ -22,38 +22,99 @@ const Dashboard = () => {
     }
   }, [user]);
 
+  const [bookmarks, setBookmarks] = useState<any[]>([]);
+
   const fetchDashboardData = async () => {
     try {
-      // Fetch enrollments with course data
+      // Fetch enrollments with course details
       const { data: enrollmentData, error: enrollmentError } = await supabase
         .from('enrollments')
-        .select(`
-          *,
-          courses (
-            id,
-            title,
-            duration_hours,
-            profiles:instructor_id (full_name)
-          )
-        `)
+        .select('*')
         .eq('user_id', user?.id)
         .order('enrolled_at', { ascending: false });
 
       if (enrollmentError) throw enrollmentError;
-      setEnrollments(enrollmentData || []);
 
-      // Fetch certificates
+      // Fetch course details separately for each enrollment
+      const enrichedEnrollments = await Promise.all(
+        (enrollmentData || []).map(async (enrollment) => {
+          const { data: courseData } = await supabase
+            .from('courses')
+            .select('id, title, thumbnail_url, duration_hours, instructor_id, category')
+            .eq('id', enrollment.course_id)
+            .single();
+
+          const { data: instructorData } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', courseData?.instructor_id)
+            .single();
+
+          return {
+            ...enrollment,
+            courses: {
+              ...courseData,
+              profiles: instructorData
+            }
+          };
+        })
+      );
+
+      setEnrollments(enrichedEnrollments);
+
+      // Fetch certificates with course info
       const { data: certData, error: certError } = await supabase
         .from('certificates')
-        .select(`
-          *,
-          courses (title)
-        `)
+        .select('*')
         .eq('user_id', user?.id)
         .order('issued_at', { ascending: false });
 
       if (certError) throw certError;
-      setCertificates(certData || []);
+
+      // Fetch course details for certificates
+      const enrichedCerts = await Promise.all(
+        (certData || []).map(async (cert) => {
+          const { data: courseData } = await supabase
+            .from('courses')
+            .select('title')
+            .eq('id', cert.course_id)
+            .single();
+
+          return {
+            ...cert,
+            courses: courseData
+          };
+        })
+      );
+
+      setCertificates(enrichedCerts);
+
+      // Fetch bookmarks
+      const { data: bookmarkData, error: bookmarkError } = await supabase
+        .from('bookmarks')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false });
+
+      if (bookmarkError) throw bookmarkError;
+
+      // Fetch course details for bookmarks
+      const enrichedBookmarks = await Promise.all(
+        (bookmarkData || []).map(async (bookmark) => {
+          const { data: courseData } = await supabase
+            .from('courses')
+            .select('id, title, thumbnail_url, level, category')
+            .eq('id', bookmark.course_id)
+            .single();
+
+          return {
+            ...bookmark,
+            courses: courseData
+          };
+        })
+      );
+
+      setBookmarks(enrichedBookmarks);
     } catch (error) {
       toast({
         title: "Error",
@@ -160,10 +221,41 @@ const Dashboard = () => {
                 <CardTitle>Bookmark</CardTitle>
                 <CardDescription>Kursus yang Anda simpan</CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground text-center py-8">
-                  Belum ada kursus yang di-bookmark
-                </p>
+              <CardContent className="space-y-4">
+                {loading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  </div>
+                ) : bookmarks.length > 0 ? (
+                  bookmarks.map((bookmark) => (
+                    <div key={bookmark.id} className="p-4 border rounded-lg hover:border-primary transition-all">
+                      <div className="flex gap-3">
+                        {bookmark.courses?.thumbnail_url && (
+                          <img 
+                            src={bookmark.courses.thumbnail_url} 
+                            alt={bookmark.courses.title}
+                            className="w-20 h-20 object-cover rounded-lg"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h3 className="font-semibold mb-1">{bookmark.courses?.title}</h3>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            {bookmark.courses?.category} • {bookmark.courses?.level}
+                          </p>
+                          <Link to={`/courses/${bookmark.courses?.id}`}>
+                            <Button size="sm" variant="outline">
+                              Lihat Kursus
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-muted-foreground text-center py-8">
+                    Belum ada kursus yang di-bookmark
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -183,23 +275,33 @@ const Dashboard = () => {
                 ) : certificates.length > 0 ? (
                   <>
                     {certificates.map((cert) => (
-                      <div key={cert.id} className="p-4 border rounded-lg hover:border-primary transition-all">
-                        <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0">
-                            <Award className="h-5 w-5 text-white" />
-                          </div>
-                          <div>
-                            <h4 className="font-semibold text-sm mb-1">{cert.courses?.title}</h4>
-                            <p className="text-xs text-muted-foreground">{cert.certificate_number}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {new Date(cert.issued_at).toLocaleDateString('id-ID', { 
-                                year: 'numeric', 
-                                month: 'short' 
-                              })}
-                            </p>
+                      <Link 
+                        key={cert.id} 
+                        to={`/certificate/verify/${cert.certificate_number}`}
+                        className="block"
+                      >
+                        <div className="p-4 border rounded-lg hover:border-primary transition-all cursor-pointer">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0">
+                              <Award className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-sm mb-1">{cert.courses?.title}</h4>
+                              <p className="text-xs text-muted-foreground">{cert.certificate_number}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {new Date(cert.issued_at).toLocaleDateString('id-ID', { 
+                                  year: 'numeric', 
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                              <Button size="sm" variant="link" className="h-auto p-0 mt-1 text-xs">
+                                Lihat Sertifikat →
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      </Link>
                     ))}
                   </>
                 ) : (
