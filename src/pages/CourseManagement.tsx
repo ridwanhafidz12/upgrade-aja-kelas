@@ -422,6 +422,14 @@ const CourseManagement = () => {
                       variant="outline"
                       size="sm"
                       className="flex-1"
+                      onClick={() => navigate(`/admin/courses/${course.id}/subtitles`)}
+                    >
+                      Subtitle
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
                       onClick={() => navigate(`/admin/courses/${course.id}/episodes`)}
                     >
                       <Video className="h-4 w-4 mr-1" />

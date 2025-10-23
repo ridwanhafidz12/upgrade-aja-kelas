@@ -67,18 +67,18 @@ const App = () => (
               } 
             />
             <Route 
-              path="/admin/courses/:courseId/episodes" 
+              path="/admin/courses/:courseId/subtitles" 
               element={
                 <ProtectedRoute requireAdmin>
-                  <EpisodeManagement />
+                  <SubtitleManagement />
                 </ProtectedRoute>
               } 
             />
             <Route 
-              path="/admin/subtitles" 
+              path="/admin/courses/:courseId/episodes" 
               element={
                 <ProtectedRoute requireAdmin>
-                  <SubtitleManagement />
+                  <EpisodeManagement />
                 </ProtectedRoute>
               } 
             />

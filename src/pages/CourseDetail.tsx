@@ -10,13 +10,33 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
+interface CourseData {
+  id: string;
+  title: string;
+  description?: string;
+  price?: number;
+  is_free?: boolean;
+  thumbnail_url?: string;
+  level?: string;
+  duration_hours?: number;
+  category_id?: string;
+  instructor_id?: string;
+  profiles?: {
+    full_name?: string;
+    avatar_url?: string;
+  } | null;
+  course_categories?: {
+    name?: string;
+  } | null;
+}
+
 const CourseDetail = () => {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  const [course, setCourse] = useState<any>(null);
+  const [course, setCourse] = useState<CourseData | null>(null);
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [enrollment, setEnrollment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -30,24 +50,55 @@ const CourseDetail = () => {
 
   const fetchCourseData = async () => {
     try {
+      setLoading(true);
+      
       // Fetch course details
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
-        .select(`
-          *,
-          profiles:instructor_id (full_name, avatar_url),
-          course_categories:category_id (name)
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
       if (courseError) throw courseError;
-      setCourse(courseData);
+      
+      // Build the full course object
+      let fullCourse: CourseData = courseData;
+      
+      // Fetch instructor profile separately
+      if (courseData?.instructor_id) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('full_name, avatar_url')
+          .eq('id', courseData.instructor_id)
+          .maybeSingle();
+        
+        if (profileData) {
+          fullCourse = { ...fullCourse, profiles: profileData };
+        }
+      }
+      
+      // Fetch category separately if category_id exists
+      if (courseData?.category_id) {
+        const { data: categoryData } = await supabase
+          .from('course_categories')
+          .select('name')
+          .eq('id', courseData.category_id)
+          .maybeSingle();
+        
+        if (categoryData) {
+          fullCourse = { ...fullCourse, course_categories: categoryData };
+        }
+      }
+      
+      setCourse(fullCourse);
 
-      // Fetch episodes
+      // Fetch episodes with subtitle info
       const { data: episodesData, error: episodesError } = await supabase
         .from('course_episodes')
-        .select('*')
+        .select(`
+          *,
+          episode_subtitles:subtitle_id (name)
+        `)
         .eq('course_id', id)
         .order('episode_number', { ascending: true });
 
@@ -66,12 +117,12 @@ const CourseDetail = () => {
         setEnrollment(enrollmentData);
       }
     } catch (error) {
+      console.error('Error fetching course:', error);
       toast({
         title: "Error",
-        description: "Gagal memuat data kursus",
+        description: error instanceof Error ? error.message : "Gagal memuat data kursus",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
@@ -258,9 +309,9 @@ const CourseDetail = () => {
                               <div className="w-5 h-5 rounded-full border-2" />
                             )}
                             <div>
-                              <p className="font-medium">{episode.title}</p>
-                              {episode.subtitle && (
-                                <p className="text-sm text-muted-foreground">{episode.subtitle}</p>
+                              <p className="font-medium">Episode {episode.episode_number}: {episode.title}</p>
+                              {episode.episode_subtitles?.name && (
+                                <p className="text-sm text-muted-foreground">Subtitle: {episode.episode_subtitles.name}</p>
                               )}
                               <p className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
                                 <Clock className="h-3 w-3" />

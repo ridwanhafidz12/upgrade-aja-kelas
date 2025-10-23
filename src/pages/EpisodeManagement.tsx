@@ -64,6 +64,7 @@ const EpisodeManagement = () => {
       const { data, error } = await supabase
         .from("episode_subtitles")
         .select("*")
+        .eq("course_id", courseId)
         .order("name", { ascending: true });
 
       if (error) throw error;
