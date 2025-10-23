@@ -21,20 +21,14 @@ const CertificateVerify = () => {
 
   const verifyCertificate = async () => {
     try {
-      const { data, error } = await supabase
-        .from('certificates')
-        .select(`
-          *,
-          profiles!user_id (full_name),
-          courses!course_id (title)
-        `)
-        .eq('certificate_number', certificateNumber)
-        .maybeSingle();
+      const { data, error } = await supabase.functions.invoke('verify-certificate', {
+        body: { certificateNumber }
+      });
 
       if (error) throw error;
 
-      if (data) {
-        setCertificate(data);
+      if (data?.valid && data?.certificate) {
+        setCertificate(data.certificate);
         setValid(true);
       } else {
         setValid(false);
