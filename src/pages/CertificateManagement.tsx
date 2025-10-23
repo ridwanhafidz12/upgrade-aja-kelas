@@ -35,6 +35,8 @@ const CertificateManagement = () => {
   const [loading, setLoading] = useState(true);
   const [uploadingTemplate, setUploadingTemplate] = useState(false);
   const [selectedCourseForTemplate, setSelectedCourseForTemplate] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchData();
@@ -77,7 +79,26 @@ const CertificateManagement = () => {
       if (coursesResult.error) throw coursesResult.error;
 
       setCertificates(certsWithProfiles);
-      setCourses(coursesResult.data || []);
+      const courseList = coursesResult.data || [];
+      setCourses(courseList);
+
+      // Generate signed URLs for private template previews
+      const map: Record<string, string> = {};
+      await Promise.all(
+        courseList.map(async (course) => {
+          if (course.certificate_template_url) {
+            const key = course.certificate_template_url.split('/').pop() as string;
+            const { data } = await supabase
+              .storage
+              .from('certificate-templates')
+              .createSignedUrl(key, 3600);
+            if (data?.signedUrl) {
+              map[course.id] = data.signedUrl;
+            }
+          }
+        })
+      );
+      setSignedUrls(map);
     } catch (error: any) {
       toast.error("Gagal memuat data: " + error.message);
     } finally {
@@ -85,14 +106,14 @@ const CertificateManagement = () => {
     }
   };
 
-  const handleTemplateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0] || !selectedCourseForTemplate) {
+  const saveTemplate = async () => {
+    if (!selectedCourseForTemplate || !selectedFile) {
       toast.error("Pilih kursus dan file template terlebih dahulu");
       return;
     }
 
-    const file = e.target.files[0];
-    
+    const file = selectedFile;
+
     // Validate file type
     if (!file.type.includes('image')) {
       toast.error("File harus berupa gambar (PNG, JPG, etc)");
@@ -100,12 +121,12 @@ const CertificateManagement = () => {
     }
 
     setUploadingTemplate(true);
-    
+
     try {
-      // Upload to storage
+      // Upload to storage with deterministic path (1 template per course)
       const fileExt = file.name.split('.').pop();
       const fileName = `${selectedCourseForTemplate}-template.${fileExt}`;
-      
+
       // Delete old template if exists
       const course = courses.find(c => c.id === selectedCourseForTemplate);
       if (course?.certificate_template_url) {
@@ -123,7 +144,7 @@ const CertificateManagement = () => {
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
+      // Store public URL (for reference); we'll use signed URLs for preview
       const { data: { publicUrl } } = supabase.storage
         .from('certificate-templates')
         .getPublicUrl(fileName);
@@ -136,14 +157,12 @@ const CertificateManagement = () => {
 
       if (updateError) throw updateError;
 
-      toast.success("Template sertifikat berhasil diupload!");
+      toast.success("Template sertifikat berhasil disimpan!");
       setSelectedCourseForTemplate("");
-      fetchData();
-      
-      // Reset file input
-      e.target.value = '';
+      setSelectedFile(null);
+      await fetchData();
     } catch (error: any) {
-      toast.error("Gagal upload template: " + error.message);
+      toast.error("Gagal menyimpan template: " + error.message);
     } finally {
       setUploadingTemplate(false);
     }
@@ -222,16 +241,23 @@ const CertificateManagement = () => {
                     id="template-file"
                     type="file"
                     accept="image/*"
-                    onChange={handleTemplateUpload}
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                     disabled={uploadingTemplate}
                     className="flex-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
                   />
+                  <Button
+                    type="button"
+                    onClick={saveTemplate}
+                    disabled={!selectedCourseForTemplate || !selectedFile || uploadingTemplate}
+                  >
+                    <Upload className="mr-2 h-4 w-4" /> Simpan Template
+                  </Button>
                 </div>
                 {selectedCourse?.certificate_template_url && (
                   <div className="mt-3">
                     <p className="text-xs text-muted-foreground mb-2">Template saat ini:</p>
                     <img 
-                      src={selectedCourse.certificate_template_url} 
+                      src={signedUrls[selectedCourse.id] || selectedCourse.certificate_template_url} 
                       alt="Current template" 
                       className="w-64 h-auto border rounded-lg"
                     />
@@ -248,6 +274,57 @@ const CertificateManagement = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Daftar Template per Kursus */}
+        <div className="mb-10">
+          <h2 className="text-2xl font-bold mb-4">Template per Kursus</h2>
+          <Card>
+            <CardContent className="space-y-4 pt-6">
+              {courses.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Belum ada kursus terbit.</p>
+              ) : (
+                courses.map((course) => (
+                  <div key={course.id} className="flex items-center justify-between gap-4 p-4 border rounded-lg">
+                    <div>
+                      <p className="font-medium">{course.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {course.certificate_template_url ? 'Template tersedia' : 'Belum ada template'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {course.certificate_template_url && (
+                        <img
+                          src={signedUrls[course.id] || course.certificate_template_url}
+                          alt={`Template ${course.title}`}
+                          className="w-40 h-auto rounded border"
+                        />
+                      )}
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            setSelectedCourseForTemplate(course.id);
+                            setSelectedFile(e.target.files?.[0] || null);
+                          }}
+                        />
+                        <Button variant="outline" size="sm">Ganti Template</Button>
+                      </label>
+                      <Button
+                        size="sm"
+                        onClick={saveTemplate}
+                        disabled={uploadingTemplate || selectedCourseForTemplate !== course.id || !selectedFile}
+                      >
+                        Simpan
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Certificates List */}
         <div>
@@ -273,13 +350,13 @@ const CertificateManagement = () => {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        {cert.qr_code_url && (
+                        {cert.certificate_number && (
                           <Button
                             variant="outline"
                             size="sm"
                             asChild
                           >
-                            <a href={cert.qr_code_url} target="_blank" rel="noopener noreferrer">
+                            <a href={`/certificate/verify/${cert.certificate_number}`}>
                               <ExternalLink className="h-4 w-4" />
                             </a>
                           </Button>

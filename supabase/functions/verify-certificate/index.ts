@@ -23,31 +23,41 @@ serve(async (req) => {
       throw new Error('Missing certificate number');
     }
 
-    // Fetch certificate with related data
-    const { data: certificate, error } = await supabase
+    // Get certificate only (avoid relying on FK-based nested selects)
+    const { data: cert, error: certError } = await supabase
       .from('certificates')
-      .select(`
-        *,
-        profiles!user_id (full_name),
-        courses!course_id (title)
-      `)
+      .select('*')
       .eq('certificate_number', certificateNumber)
       .maybeSingle();
 
-    if (error) {
-      console.error('Error fetching certificate:', error);
-      throw error;
+    if (certError) {
+      console.error('Error fetching certificate:', certError);
+      throw certError;
     }
 
+    if (!cert) {
+      return new Response(
+        JSON.stringify({ success: true, certificate: null, valid: false }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Fetch related info separately (no FK dependency)
+    const [{ data: profile }, { data: course }] = await Promise.all([
+      supabase.from('profiles').select('full_name').eq('id', cert.user_id).maybeSingle(),
+      supabase.from('courses').select('title').eq('id', cert.course_id).maybeSingle(),
+    ]);
+
+    const responseCert = {
+      ...cert,
+      profiles: profile || null,
+      courses: course || null,
+    };
+
     return new Response(
-      JSON.stringify({
-        success: true,
-        certificate: certificate,
-        valid: !!certificate
-      }),
+      JSON.stringify({ success: true, certificate: responseCert, valid: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error) {
     console.error('Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
