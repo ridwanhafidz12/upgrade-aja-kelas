@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { GraduationCap, Award, Users, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
@@ -125,16 +126,21 @@ const Index = () => {
           ) : (
             <div className="grid md:grid-cols-3 gap-8">
               {featuredCourses.map((course) => (
-                <Card key={course.id}>
+                <Card key={course.id} className="group overflow-hidden border hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
                   {course.thumbnail_url && (
                     <img
                       src={course.thumbnail_url}
-                      alt={course.title}
+                      alt={`Thumbnail kursus ${course.title}`}
                       className="w-full h-48 object-cover"
+                      loading="lazy"
+                      decoding="async"
                     />
                   )}
                   <CardHeader>
-                    <CardTitle>{course.title}</CardTitle>
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge variant="secondary">{course.course_categories?.name || "Umum"}</Badge>
+                    </div>
+                    <CardTitle className="line-clamp-2 group-hover:text-primary transition-colors">{course.title}</CardTitle>
                     <CardDescription className="line-clamp-2">{course.description}</CardDescription>
                   </CardHeader>
                   <CardContent>

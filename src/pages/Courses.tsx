@@ -114,12 +114,14 @@ const Courses = () => {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCourses.map((course) => (
-              <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+              <Card key={course.id} className="group overflow-hidden border hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5">
                 {course.thumbnail_url && (
                   <img
                     src={course.thumbnail_url}
-                    alt={course.title}
+                    alt={`Thumbnail kursus ${course.title}`}
                     className="w-full h-48 object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                 )}
                 <CardHeader>
@@ -127,24 +129,14 @@ const Courses = () => {
                     <Badge variant="secondary">{course.course_categories?.name || "Umum"}</Badge>
                     <Badge variant="outline">{course.level}</Badge>
                   </div>
-                  <CardTitle className="line-clamp-2">{course.title}</CardTitle>
+                  <CardTitle className="line-clamp-2 group-hover:text-primary transition-colors">{course.title}</CardTitle>
                   <CardDescription className="line-clamp-2">{course.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      {course.duration_hours} jam
+                  <div className="flex items-center justify-between">
+                    <div className="text-2xl font-bold text-primary">
+                      {course.is_free ? "Gratis" : `Rp ${course.price.toLocaleString('id-ID')}`}
                     </div>
-                    {course.profiles?.full_name && (
-                      <div className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        {course.profiles.full_name}
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-2xl font-bold text-primary">
-                    {course.is_free ? "Gratis" : `Rp ${course.price.toLocaleString('id-ID')}`}
                   </div>
                 </CardContent>
                 <CardFooter>

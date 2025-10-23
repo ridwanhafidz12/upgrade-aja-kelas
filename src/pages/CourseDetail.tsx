@@ -48,6 +48,10 @@ const CourseDetail = () => {
     }
   }, [id, user]);
 
+  useEffect(() => {
+    document.title = course ? `${course.title} | Kursus - Upgradeaja` : "Kursus | Upgradeaja";
+  }, [course]);
+
   const fetchCourseData = async () => {
     try {
       setLoading(true);
@@ -57,9 +61,16 @@ const CourseDetail = () => {
         .from('courses')
         .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (courseError) throw courseError;
+
+      if (!courseData) {
+        setCourse(null);
+        setEpisodes([]);
+        setEnrollment(null);
+        return;
+      }
       
       // Build the full course object
       let fullCourse: CourseData = courseData;
@@ -123,6 +134,7 @@ const CourseDetail = () => {
         description: error instanceof Error ? error.message : "Gagal memuat data kursus",
         variant: "destructive",
       });
+    } finally {
       setLoading(false);
     }
   };
