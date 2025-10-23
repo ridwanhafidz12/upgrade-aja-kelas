@@ -4,6 +4,7 @@ import { ArrowRight, BookOpen, Award, Users, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import heroImage from "@/assets/hero-learning.jpg";
+import FAQ from "@/components/FAQ";
 
 const Index = () => {
   const features = [
@@ -171,6 +172,9 @@ const Index = () => {
         </div>
       </section>
 
+      {/* FAQ Section */}
+      <FAQ />
+
       {/* Footer */}
       <footer className="border-t py-12 bg-secondary/30">
         <div className="container mx-auto px-4">
@@ -191,15 +195,15 @@ const Index = () => {
             <div>
               <h4 className="font-semibold mb-4">Perusahaan</h4>
               <ul className="space-y-2 text-muted-foreground">
-                <li><a href="#" className="hover:text-primary">Tentang Kami</a></li>
-                <li><a href="#" className="hover:text-primary">Kontak</a></li>
+                <li><Link to="/about" className="hover:text-primary">Tentang Kami</Link></li>
+                <li><a href="mailto:ridwanhafidz856@gmail.com" className="hover:text-primary">Kontak</a></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Legal</h4>
               <ul className="space-y-2 text-muted-foreground">
-                <li><a href="#" className="hover:text-primary">Syarat & Ketentuan</a></li>
-                <li><a href="#" className="hover:text-primary">Kebijakan Privasi</a></li>
+                <li><Link to="/terms" className="hover:text-primary">Syarat & Ketentuan</Link></li>
+                <li><Link to="/privacy" className="hover:text-primary">Kebijakan Privasi</Link></li>
               </ul>
             </div>
           </div>

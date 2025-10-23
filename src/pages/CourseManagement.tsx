@@ -306,6 +306,15 @@ const CourseManagement = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {courses.map((course) => (
               <Card key={course.id}>
+                {course.thumbnail_url && (
+                  <div className="h-48 overflow-hidden">
+                    <img 
+                      src={course.thumbnail_url} 
+                      alt={course.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
                 <CardHeader>
                   <CardTitle className="flex items-start justify-between">
                     <span className="line-clamp-2">{course.title}</span>

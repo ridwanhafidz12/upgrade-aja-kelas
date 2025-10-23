@@ -13,6 +13,9 @@ import CourseDetail from "./pages/CourseDetail";
 import Admin from "./pages/Admin";
 import CourseManagement from "./pages/CourseManagement";
 import EpisodeManagement from "./pages/EpisodeManagement";
+import AboutUs from "./pages/AboutUs";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +32,9 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/courses" element={<Courses />} />
             <Route path="/courses/:id" element={<CourseDetail />} />
+            <Route path="/about" element={<AboutUs />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
             <Route 
               path="/dashboard" 
               element={

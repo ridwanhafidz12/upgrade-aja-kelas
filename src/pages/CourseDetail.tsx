@@ -253,9 +253,12 @@ const CourseDetail = () => {
                             )}
                             <div>
                               <p className="font-medium">{episode.title}</p>
-                              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                              {episode.subtitle && (
+                                <p className="text-sm text-muted-foreground">{episode.subtitle}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
                                 <Clock className="h-3 w-3" />
-                                {episode.duration}
+                                {episode.duration_minutes ? `${episode.duration_minutes} menit` : 'Durasi variatif'}
                               </p>
                             </div>
                           </div>

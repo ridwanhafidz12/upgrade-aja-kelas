@@ -58,6 +58,7 @@ export type Database = {
           episode_number: number
           id: string
           is_preview: boolean | null
+          subtitle: string | null
           title: string
           updated_at: string
           youtube_url: string
@@ -70,6 +71,7 @@ export type Database = {
           episode_number: number
           id?: string
           is_preview?: boolean | null
+          subtitle?: string | null
           title: string
           updated_at?: string
           youtube_url: string
@@ -82,6 +84,7 @@ export type Database = {
           episode_number?: number
           id?: string
           is_preview?: boolean | null
+          subtitle?: string | null
           title?: string
           updated_at?: string
           youtube_url?: string

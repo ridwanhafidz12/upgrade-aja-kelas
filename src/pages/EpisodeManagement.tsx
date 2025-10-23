@@ -14,6 +14,7 @@ import { toast } from "sonner";
 interface Episode {
   id: string;
   title: string;
+  subtitle?: string;
   description: string;
   youtube_url: string;
   episode_number: number;
@@ -32,6 +33,7 @@ const EpisodeManagement = () => {
 
   const [formData, setFormData] = useState({
     title: "",
+    subtitle: "",
     description: "",
     youtube_url: "",
     episode_number: 1,
@@ -128,6 +130,7 @@ const EpisodeManagement = () => {
     setEditingEpisode(episode);
     setFormData({
       title: episode.title,
+      subtitle: episode.subtitle || "",
       description: episode.description || "",
       youtube_url: episode.youtube_url,
       episode_number: episode.episode_number,
@@ -145,6 +148,7 @@ const EpisodeManagement = () => {
     
     setFormData({
       title: "",
+      subtitle: "",
       description: "",
       youtube_url: "",
       episode_number: nextEpisodeNumber,
@@ -209,6 +213,16 @@ const EpisodeManagement = () => {
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="subtitle">Sub Judul</Label>
+                  <Input
+                    id="subtitle"
+                    value={formData.subtitle}
+                    onChange={(e) => setFormData({ ...formData, subtitle: e.target.value })}
+                    placeholder="Sub judul episode (opsional)"
                   />
                 </div>
 
@@ -281,7 +295,12 @@ const EpisodeManagement = () => {
               <Card key={episode.id}>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
-                    <span>Episode {episode.episode_number}: {episode.title}</span>
+                    <div>
+                      <span>Episode {episode.episode_number}: {episode.title}</span>
+                      {episode.subtitle && (
+                        <p className="text-sm font-medium text-muted-foreground mt-1">{episode.subtitle}</p>
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       {episode.is_preview && (
                         <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded">
