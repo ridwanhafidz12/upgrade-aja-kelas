@@ -2,9 +2,8 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Award, CheckCircle2, XCircle, Calendar, User, BookOpen, QrCode } from "lucide-react";
+import { XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const CertificateVerify = () => {
@@ -12,6 +11,7 @@ const CertificateVerify = () => {
   const [certificate, setCertificate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [valid, setValid] = useState(false);
+  const [templateUrl, setTemplateUrl] = useState<string>("");
 
   useEffect(() => {
     if (certificateNumber) {
@@ -30,6 +30,26 @@ const CertificateVerify = () => {
       if (data?.valid && data?.certificate) {
         setCertificate(data.certificate);
         setValid(true);
+        
+        // Fetch template URL from course
+        if (data.certificate.course_id) {
+          const { data: courseData } = await supabase
+            .from('courses')
+            .select('certificate_template_url')
+            .eq('id', data.certificate.course_id)
+            .single();
+          
+          if (courseData?.certificate_template_url) {
+            // Get signed URL for private template
+            const { data: signedData } = await supabase.storage
+              .from('certificate-templates')
+              .createSignedUrl(courseData.certificate_template_url, 3600);
+            
+            if (signedData?.signedUrl) {
+              setTemplateUrl(signedData.signedUrl);
+            }
+          }
+        }
       } else {
         setValid(false);
       }
@@ -57,99 +77,74 @@ const CertificateVerify = () => {
     <div className="min-h-screen bg-secondary/30">
       <Navbar />
 
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-2xl mx-auto">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-5xl mx-auto">
           {valid && certificate ? (
-            <Card className="border-2 border-success">
-              <CardHeader className="text-center pb-6">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-success to-success/60 flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle2 className="h-10 w-10 text-white" />
-                </div>
-                <CardTitle className="text-2xl mb-2">Sertifikat Valid</CardTitle>
-                <Badge variant="outline" className="mx-auto">
-                  {certificate.certificate_number}
-                </Badge>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="text-center p-6 bg-gradient-to-br from-primary/10 to-accent/10 rounded-lg">
-                  <Award className="h-16 w-16 text-primary mx-auto mb-4" />
-                  <h2 className="text-3xl font-bold mb-2">{certificate.courses?.title}</h2>
-                  <p className="text-muted-foreground">Sertifikat Penyelesaian Kursus</p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 p-4 border rounded-lg">
-                    <User className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Penerima</p>
-                      <p className="font-semibold">{certificate.profiles?.full_name}</p>
-                    </div>
+            <div className="space-y-6">
+              {/* Certificate Display with Template Background */}
+              <div className="relative w-full aspect-[1.414/1] max-w-4xl mx-auto bg-white rounded-lg shadow-2xl overflow-hidden">
+                {/* Template Background */}
+                {templateUrl && (
+                  <img 
+                    src={templateUrl} 
+                    alt="Certificate Template" 
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                )}
+                
+                {/* Overlay Content */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-8 md:p-12 text-center">
+                  {/* Recipient Name */}
+                  <div className="mb-6 md:mb-8">
+                    <h2 className="text-3xl md:text-5xl font-bold text-gray-800 mb-2">
+                      {certificate.profiles?.full_name}
+                    </h2>
                   </div>
 
-                  <div className="flex items-center gap-3 p-4 border rounded-lg">
-                    <BookOpen className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Kursus</p>
-                      <p className="font-semibold">{certificate.courses?.title}</p>
-                    </div>
+                  {/* Course Title */}
+                  <div className="mb-6 md:mb-8">
+                    <p className="text-base md:text-xl text-gray-700 mb-2">Telah menyelesaikan kursus</p>
+                    <h3 className="text-2xl md:text-4xl font-semibold text-gray-900">
+                      {certificate.courses?.title}
+                    </h3>
                   </div>
 
-                  <div className="flex items-center gap-3 p-4 border rounded-lg">
-                    <Calendar className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Tanggal Terbit</p>
-                      <p className="font-semibold">
-                        {new Date(certificate.issued_at).toLocaleDateString('id-ID', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric'
-                        })}
-                      </p>
-                    </div>
+                  {/* Date */}
+                  <div className="mb-6 md:mb-8">
+                    <p className="text-sm md:text-base text-gray-600">
+                      Diterbitkan pada {new Date(certificate.issued_at).toLocaleDateString('id-ID', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </p>
                   </div>
-                </div>
 
-                {/* QR Code Display */}
-                {certificate.qr_code_url && (
-                  <div className="p-6 bg-muted/50 rounded-lg">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <QrCode className="h-5 w-5 text-primary" />
-                        <p className="text-sm font-medium">Kode Verifikasi QR</p>
-                      </div>
-                      <div className="p-3 bg-white border-2 border-primary rounded-lg">
+                  {/* Certificate Number & QR Code */}
+                  <div className="absolute bottom-6 md:bottom-8 right-6 md:right-8 flex flex-col items-center gap-2">
+                    {certificate.qr_code_url && (
+                      <div className="p-2 bg-white rounded-lg shadow-lg">
                         <img 
                           src={certificate.qr_code_url} 
-                          alt="QR Code Verifikasi" 
-                          className="w-32 h-32"
+                          alt="QR Code" 
+                          className="w-20 h-20 md:w-24 md:h-24"
                         />
                       </div>
-                      <p className="text-xs text-muted-foreground text-center max-w-sm">
-                        Scan QR code ini untuk memverifikasi keaslian sertifikat secara cepat
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="text-center pt-4 border-t">
-                  <p className="text-sm text-muted-foreground">
-                    Sertifikat ini sah dan dikeluarkan oleh sistem kami.
-                  </p>
-                  <div className="flex gap-3 justify-center mt-4">
-                    <Link to="/courses">
-                      <Button variant="outline">
-                        Lihat Kursus Lainnya
-                      </Button>
-                    </Link>
-                    <Link to="/dashboard">
-                      <Button>
-                        Ke Dashboard
-                      </Button>
-                    </Link>
+                    )}
+                    <p className="text-xs text-gray-600 font-mono">{certificate.certificate_number}</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 justify-center">
+                <Link to="/courses">
+                  <Button variant="outline">
+                    Lihat Kursus Lainnya
+                  </Button>
+                </Link>
+              </div>
+            </div>
           ) : (
             <Card className="border-2 border-destructive">
               <CardHeader className="text-center pb-6">
