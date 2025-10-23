@@ -248,14 +248,14 @@ const EpisodeManagement = () => {
                 <div>
                   <Label htmlFor="subtitle_id">Sub Judul</Label>
                   <Select
-                    value={formData.subtitle_id}
-                    onValueChange={(value) => setFormData({ ...formData, subtitle_id: value })}
+                    value={formData.subtitle_id || "none"}
+                    onValueChange={(value) => setFormData({ ...formData, subtitle_id: value === "none" ? "" : value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih subtitle (opsional)..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Tanpa Subtitle</SelectItem>
+                      <SelectItem value="none">Tanpa Subtitle</SelectItem>
                       {subtitles.map((subtitle) => (
                         <SelectItem key={subtitle.id} value={subtitle.id}>
                           {subtitle.name}
