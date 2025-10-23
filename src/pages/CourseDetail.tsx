@@ -35,7 +35,8 @@ const CourseDetail = () => {
         .from('courses')
         .select(`
           *,
-          profiles:instructor_id (full_name, avatar_url)
+          profiles:instructor_id (full_name, avatar_url),
+          course_categories:category_id (name)
         `)
         .eq('id', id)
         .single();
@@ -185,7 +186,12 @@ const CourseDetail = () => {
                 <Play className="h-24 w-24 text-white/80" />
               )}
               <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/60 to-transparent text-white">
-                <Badge className="mb-2">{course.level || 'Beginner'}</Badge>
+                <div className="flex gap-2 mb-2">
+                  {course.course_categories?.name && (
+                    <Badge variant="secondary">{course.course_categories.name}</Badge>
+                  )}
+                  <Badge className="bg-white/20">{course.level || 'Beginner'}</Badge>
+                </div>
                 <h1 className="text-3xl font-bold mb-2">{course.title}</h1>
                 <p className="text-white/90">Oleh {course.profiles?.full_name || 'Instruktur'}</p>
               </div>

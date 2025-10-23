@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Trash2, ExternalLink } from "lucide-react";
+import { Trash2, ExternalLink, Upload, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -27,23 +26,13 @@ interface Certificate {
 interface Course {
   id: string;
   title: string;
-}
-
-interface User {
-  id: string;
-  full_name: string;
+  certificate_template_url: string | null;
 }
 
 const CertificateManagement = () => {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    user_id: "",
-    course_id: ""
-  });
   const [uploadingTemplate, setUploadingTemplate] = useState(false);
   const [selectedCourseForTemplate, setSelectedCourseForTemplate] = useState("");
 
@@ -53,7 +42,7 @@ const CertificateManagement = () => {
 
   const fetchData = async () => {
     try {
-      const [certsResult, coursesResult, usersResult] = await Promise.all([
+      const [certsResult, coursesResult] = await Promise.all([
         supabase
           .from("certificates")
           .select(`
@@ -63,13 +52,9 @@ const CertificateManagement = () => {
           .order("issued_at", { ascending: false }),
         supabase
           .from("courses")
-          .select("id, title")
+          .select("id, title, certificate_template_url")
           .eq("status", "published")
-          .order("title"),
-        supabase
-          .from("profiles")
-          .select("id, full_name")
-          .order("full_name")
+          .order("title")
       ]);
       
       // Fetch profiles separately for certificates
@@ -90,58 +75,14 @@ const CertificateManagement = () => {
 
       if (certsResult.error) throw certsResult.error;
       if (coursesResult.error) throw coursesResult.error;
-      if (usersResult.error) throw usersResult.error;
 
       setCertificates(certsWithProfiles);
       setCourses(coursesResult.data || []);
-      setUsers(usersResult.data || []);
     } catch (error: any) {
       toast.error("Gagal memuat data: " + error.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    try {
-      const { data, error } = await supabase.functions.invoke("generate-certificate", {
-        body: {
-          userId: formData.user_id,
-          courseId: formData.course_id
-        }
-      });
-
-      if (error) throw error;
-      toast.success("Sertifikat berhasil dibuat!");
-      setIsDialogOpen(false);
-      resetForm();
-      fetchData();
-    } catch (error: any) {
-      toast.error("Gagal membuat sertifikat: " + error.message);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Apakah Anda yakin ingin menghapus sertifikat ini?")) return;
-
-    try {
-      const { error } = await supabase
-        .from("certificates")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-      toast.success("Sertifikat berhasil dihapus!");
-      fetchData();
-    } catch (error: any) {
-      toast.error("Gagal menghapus sertifikat: " + error.message);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({ user_id: "", course_id: "" });
   };
 
   const handleTemplateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -164,7 +105,19 @@ const CertificateManagement = () => {
       // Upload to storage
       const fileExt = file.name.split('.').pop();
       const fileName = `${selectedCourseForTemplate}-template.${fileExt}`;
-      const { error: uploadError, data } = await supabase.storage
+      
+      // Delete old template if exists
+      const course = courses.find(c => c.id === selectedCourseForTemplate);
+      if (course?.certificate_template_url) {
+        const oldFileName = course.certificate_template_url.split('/').pop();
+        if (oldFileName) {
+          await supabase.storage
+            .from('certificate-templates')
+            .remove([oldFileName]);
+        }
+      }
+
+      const { error: uploadError } = await supabase.storage
         .from('certificate-templates')
         .upload(fileName, file, { upsert: true });
 
@@ -186,6 +139,9 @@ const CertificateManagement = () => {
       toast.success("Template sertifikat berhasil diupload!");
       setSelectedCourseForTemplate("");
       fetchData();
+      
+      // Reset file input
+      e.target.value = '';
     } catch (error: any) {
       toast.error("Gagal upload template: " + error.message);
     } finally {
@@ -193,170 +149,165 @@ const CertificateManagement = () => {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus sertifikat ini?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("certificates")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      toast.success("Sertifikat berhasil dihapus!");
+      fetchData();
+    } catch (error: any) {
+      toast.error("Gagal menghapus sertifikat: " + error.message);
+    }
+  };
+
+  const selectedCourse = courses.find(c => c.id === selectedCourseForTemplate);
+
   return (
     <div className="min-h-screen bg-secondary/30">
       <Navbar />
       
       <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-bold mb-2">Kelola Sertifikat</h1>
-            <p className="text-muted-foreground">Terbitkan dan kelola sertifikat penyelesaian kursus</p>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold mb-2">Kelola Sertifikat</h1>
+          <p className="text-muted-foreground">
+            Upload template sertifikat untuk setiap kursus. Sertifikat akan otomatis dibuat ketika user menyelesaikan kursus.
+          </p>
+        </div>
 
-          <div className="flex gap-2">
-            <Dialog open={isDialogOpen} onOpenChange={(open) => {
-              setIsDialogOpen(open);
-              if (!open) resetForm();
-            }}>
-              <DialogTrigger asChild>
-                <Button size="lg" className="gap-2">
-                  <Plus className="h-5 w-5" />
-                  Terbitkan Sertifikat
-                </Button>
-              </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Terbitkan Sertifikat Baru</DialogTitle>
-              </DialogHeader>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="user_id">Pilih User *</Label>
-                  <Select
-                    value={formData.user_id}
-                    onValueChange={(value) => setFormData({ ...formData, user_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih user..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="course_id">Pilih Kursus *</Label>
-                  <Select
-                    value={formData.course_id}
-                    onValueChange={(value) => setFormData({ ...formData, course_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih kursus..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {courses.map((course) => (
-                        <SelectItem key={course.id} value={course.id}>
-                          {course.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex gap-2 pt-4">
-                  <Button type="submit" className="flex-1">
-                    Terbitkan Sertifikat
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIsDialogOpen(false);
-                      resetForm();
-                    }}
-                  >
-                    Batal
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          <Card className="w-96">
-            <CardContent className="p-4">
-              <Label className="text-sm font-medium mb-2 block">Upload Template Sertifikat</Label>
+        {/* Upload Template Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Upload Template Sertifikat</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="course-select" className="text-sm font-medium mb-2 block">
+                Pilih Kursus
+              </Label>
               <Select
                 value={selectedCourseForTemplate}
                 onValueChange={setSelectedCourseForTemplate}
               >
-                <SelectTrigger className="mb-2">
-                  <SelectValue placeholder="Pilih kursus..." />
+                <SelectTrigger id="course-select">
+                  <SelectValue placeholder="Pilih kursus untuk upload template..." />
                 </SelectTrigger>
                 <SelectContent>
                   {courses.map((course) => (
                     <SelectItem key={course.id} value={course.id}>
-                      {course.title}
+                      <div className="flex items-center gap-2">
+                        {course.certificate_template_url && (
+                          <CheckCircle2 className="h-4 w-4 text-success" />
+                        )}
+                        {course.title}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleTemplateUpload}
-                disabled={!selectedCourseForTemplate || uploadingTemplate}
-                className="w-full text-sm"
-              />
-            </CardContent>
-          </Card>
-          </div>
-        </div>
+            </div>
 
-        {loading ? (
-          <div className="text-center py-12">Loading...</div>
-        ) : (
-          <div className="space-y-4">
-            {certificates.map((cert) => (
-              <Card key={cert.id}>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div>
-                      <div className="text-lg">{cert.certificate_number}</div>
-                      <div className="text-sm font-normal text-muted-foreground mt-1">
-                        {cert.profiles?.full_name} - {cert.courses?.title}
+            {selectedCourseForTemplate && (
+              <div>
+                <Label htmlFor="template-file" className="text-sm font-medium mb-2 block">
+                  Upload Template (PNG/JPG)
+                </Label>
+                <div className="flex gap-2">
+                  <input
+                    id="template-file"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleTemplateUpload}
+                    disabled={uploadingTemplate}
+                    className="flex-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                  />
+                </div>
+                {selectedCourse?.certificate_template_url && (
+                  <div className="mt-3">
+                    <p className="text-xs text-muted-foreground mb-2">Template saat ini:</p>
+                    <img 
+                      src={selectedCourse.certificate_template_url} 
+                      alt="Current template" 
+                      className="w-64 h-auto border rounded-lg"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                <strong>Catatan:</strong> Template akan digunakan untuk generate sertifikat otomatis ketika user menyelesaikan 100% dari kursus. 
+                Pastikan template memiliki ruang untuk nama user, judul kursus, dan tanggal.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Certificates List */}
+        <div>
+          <h2 className="text-2xl font-bold mb-4">Daftar Sertifikat Terbit</h2>
+          {loading ? (
+            <div className="text-center py-12">Loading...</div>
+          ) : certificates.length === 0 ? (
+            <Card>
+              <CardContent className="p-12 text-center text-muted-foreground">
+                Belum ada sertifikat yang diterbitkan. Sertifikat akan otomatis dibuat ketika user menyelesaikan kursus.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {certificates.map((cert) => (
+                <Card key={cert.id}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <div>
+                        <div className="text-lg">{cert.certificate_number}</div>
+                        <div className="text-sm font-normal text-muted-foreground mt-1">
+                          {cert.profiles?.full_name} - {cert.courses?.title}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      {cert.qr_code_url && (
+                      <div className="flex gap-2">
+                        {cert.qr_code_url && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                          >
+                            <a href={cert.qr_code_url} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        )}
                         <Button
-                          variant="outline"
+                          variant="destructive"
                           size="sm"
-                          asChild
+                          onClick={() => handleDelete(cert.id)}
                         >
-                          <a href={cert.qr_code_url} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      )}
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(cert.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Diterbitkan: {new Date(cert.issued_at).toLocaleDateString("id-ID", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric"
-                    })}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      Diterbitkan: {new Date(cert.issued_at).toLocaleDateString("id-ID", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric"
+                      })}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

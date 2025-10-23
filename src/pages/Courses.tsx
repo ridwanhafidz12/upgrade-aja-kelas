@@ -17,6 +17,7 @@ interface Course {
   is_free: boolean;
   level: string;
   duration_hours: number;
+  category?: string;
   course_categories?: {
     name: string;
   };
@@ -71,7 +72,10 @@ const Courses = () => {
 
   const filteredCourses = selectedCategory === "all"
     ? courses
-    : courses.filter(course => course.course_categories?.name.toLowerCase() === selectedCategory.toLowerCase());
+    : courses.filter(course => {
+        const categoryName = course.course_categories?.name?.toLowerCase() || course.category?.toLowerCase();
+        return categoryName === selectedCategory.toLowerCase();
+      });
 
   return (
     <div className="min-h-screen bg-secondary/30">

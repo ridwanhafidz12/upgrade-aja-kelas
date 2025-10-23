@@ -16,6 +16,7 @@ interface Course {
   thumbnail_url: string;
   price: number;
   is_free: boolean;
+  category?: string;
   course_categories?: {
     name: string;
   };
