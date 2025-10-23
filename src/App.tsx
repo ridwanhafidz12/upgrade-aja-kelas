@@ -10,6 +10,8 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Courses from "./pages/Courses";
 import CourseDetail from "./pages/CourseDetail";
+import CourseLearning from "./pages/CourseLearning";
+import CertificateVerify from "./pages/CertificateVerify";
 import Admin from "./pages/Admin";
 import CourseManagement from "./pages/CourseManagement";
 import EpisodeManagement from "./pages/EpisodeManagement";
@@ -33,9 +35,11 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/courses" element={<Courses />} />
-            <Route path="/courses/:id" element={<CourseDetail />} />
-            <Route path="/about" element={<AboutUs />} />
+          <Route path="/courses" element={<Courses />} />
+          <Route path="/courses/:id" element={<CourseDetail />} />
+          <Route path="/courses/:id/learn" element={<CourseLearning />} />
+          <Route path="/certificate/verify/:certificateNumber" element={<CertificateVerify />} />
+          <Route path="/about" element={<AboutUs />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route 

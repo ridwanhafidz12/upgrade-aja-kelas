@@ -131,6 +131,7 @@ export type Database = {
         Row: {
           category: string | null
           category_id: string | null
+          certificate_template_url: string | null
           created_at: string
           description: string | null
           duration_hours: number | null
@@ -147,6 +148,7 @@ export type Database = {
         Insert: {
           category?: string | null
           category_id?: string | null
+          certificate_template_url?: string | null
           created_at?: string
           description?: string | null
           duration_hours?: number | null
@@ -163,6 +165,7 @@ export type Database = {
         Update: {
           category?: string | null
           category_id?: string | null
+          certificate_template_url?: string | null
           created_at?: string
           description?: string | null
           duration_hours?: number | null
@@ -217,6 +220,44 @@ export type Database = {
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      episode_progress: {
+        Row: {
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string | null
+          episode_id: string
+          id: string
+          last_watched_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          episode_id: string
+          id?: string
+          last_watched_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string | null
+          episode_id?: string
+          id?: string
+          last_watched_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "episode_progress_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "course_episodes"
             referencedColumns: ["id"]
           },
         ]

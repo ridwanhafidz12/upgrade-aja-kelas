@@ -313,8 +313,12 @@ const CourseDetail = () => {
 
                 <div className="space-y-2">
                   {enrollment ? (
-                    <Button className="w-full" size="lg" disabled>
-                      Sudah Terdaftar
+                    <Button 
+                      className="w-full" 
+                      size="lg"
+                      onClick={() => navigate(`/courses/${id}/learn`)}
+                    >
+                      Lanjutkan Belajar
                     </Button>
                   ) : (
                     <Button 

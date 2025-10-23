@@ -87,9 +87,12 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
+    // Create verification URL - users will scan QR and go to this page
+    const baseUrl = Deno.env.get('SUPABASE_URL')?.replace('/v1', '').replace('https://', '').split('.')[0];
+    const verificationUrl = `https://${baseUrl}.lovable.app/certificate/verify/${certNumber}`;
+    
     // Generate QR code URL using a public QR code API
-    const verificationUrl = `${Deno.env.get('SUPABASE_URL')}/verify-certificate/${certNumber}`;
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(verificationUrl)}`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(verificationUrl)}`;
 
     // Create certificate record
     const { data: certificate, error: certError } = await supabase
@@ -108,13 +111,21 @@ serve(async (req) => {
       throw new Error('Failed to create certificate');
     }
 
+    console.log('Certificate generated successfully:', {
+      certificate_number: certNumber,
+      user: profile?.full_name,
+      course: course?.title,
+      verification_url: verificationUrl
+    });
+
     return new Response(
       JSON.stringify({
         success: true,
         certificate: {
           ...certificate,
           course_title: course?.title,
-          user_name: profile?.full_name
+          user_name: profile?.full_name,
+          verification_url: verificationUrl
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

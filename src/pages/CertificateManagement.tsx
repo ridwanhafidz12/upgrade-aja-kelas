@@ -44,6 +44,8 @@ const CertificateManagement = () => {
     user_id: "",
     course_id: ""
   });
+  const [uploadingTemplate, setUploadingTemplate] = useState(false);
+  const [selectedCourseForTemplate, setSelectedCourseForTemplate] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -142,6 +144,55 @@ const CertificateManagement = () => {
     setFormData({ user_id: "", course_id: "" });
   };
 
+  const handleTemplateUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0] || !selectedCourseForTemplate) {
+      toast.error("Pilih kursus dan file template terlebih dahulu");
+      return;
+    }
+
+    const file = e.target.files[0];
+    
+    // Validate file type
+    if (!file.type.includes('image')) {
+      toast.error("File harus berupa gambar (PNG, JPG, etc)");
+      return;
+    }
+
+    setUploadingTemplate(true);
+    
+    try {
+      // Upload to storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${selectedCourseForTemplate}-template.${fileExt}`;
+      const { error: uploadError, data } = await supabase.storage
+        .from('certificate-templates')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('certificate-templates')
+        .getPublicUrl(fileName);
+
+      // Update course with template URL
+      const { error: updateError } = await supabase
+        .from('courses')
+        .update({ certificate_template_url: publicUrl })
+        .eq('id', selectedCourseForTemplate);
+
+      if (updateError) throw updateError;
+
+      toast.success("Template sertifikat berhasil diupload!");
+      setSelectedCourseForTemplate("");
+      fetchData();
+    } catch (error: any) {
+      toast.error("Gagal upload template: " + error.message);
+    } finally {
+      setUploadingTemplate(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-secondary/30">
       <Navbar />
@@ -153,16 +204,17 @@ const CertificateManagement = () => {
             <p className="text-muted-foreground">Terbitkan dan kelola sertifikat penyelesaian kursus</p>
           </div>
 
-          <Dialog open={isDialogOpen} onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) resetForm();
-          }}>
-            <DialogTrigger asChild>
-              <Button size="lg" className="gap-2">
-                <Plus className="h-5 w-5" />
-                Terbitkan Sertifikat
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
+            }}>
+              <DialogTrigger asChild>
+                <Button size="lg" className="gap-2">
+                  <Plus className="h-5 w-5" />
+                  Terbitkan Sertifikat
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Terbitkan Sertifikat Baru</DialogTitle>
@@ -225,6 +277,35 @@ const CertificateManagement = () => {
               </form>
             </DialogContent>
           </Dialog>
+
+          <Card className="w-96">
+            <CardContent className="p-4">
+              <Label className="text-sm font-medium mb-2 block">Upload Template Sertifikat</Label>
+              <Select
+                value={selectedCourseForTemplate}
+                onValueChange={setSelectedCourseForTemplate}
+              >
+                <SelectTrigger className="mb-2">
+                  <SelectValue placeholder="Pilih kursus..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {courses.map((course) => (
+                    <SelectItem key={course.id} value={course.id}>
+                      {course.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleTemplateUpload}
+                disabled={!selectedCourseForTemplate || uploadingTemplate}
+                className="w-full text-sm"
+              />
+            </CardContent>
+          </Card>
+          </div>
         </div>
 
         {loading ? (
