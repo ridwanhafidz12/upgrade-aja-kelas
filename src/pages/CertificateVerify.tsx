@@ -3,8 +3,9 @@ import { useParams, Link } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { XCircle } from "lucide-react";
+import { XCircle, Copy, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import QRCode from "qrcode";
 
 const CertificateVerify = () => {
   const { certificateNumber } = useParams();
@@ -12,12 +13,48 @@ const CertificateVerify = () => {
   const [loading, setLoading] = useState(true);
   const [valid, setValid] = useState(false);
   const [templateUrl, setTemplateUrl] = useState<string>("");
+  const [currentUrl, setCurrentUrl] = useState<string>("");
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    // Dapatkan URL saat ini
+    const url = window.location.href;
+    setCurrentUrl(url);
+    
+    // Generate QR Code untuk URL saat ini
+    generateQRCode(url);
+    
     if (certificateNumber) {
       verifyCertificate();
     }
   }, [certificateNumber]);
+
+  const generateQRCode = async (text: string) => {
+    try {
+      const qrCodeDataUrl = await QRCode.toDataURL(text, {
+        width: 200,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      setQrCodeUrl(qrCodeDataUrl);
+    } catch (err) {
+      console.error('Error generating QR code:', err);
+    }
+  };
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(currentUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+    }
+  };
 
   const verifyCertificate = async () => {
     try {
@@ -122,11 +159,11 @@ const CertificateVerify = () => {
 
                   {/* Certificate Number & QR Code */}
                   <div className="absolute bottom-6 md:bottom-8 right-6 md:right-8 flex flex-col items-center gap-2">
-                    {certificate.qr_code_url && (
+                    {qrCodeUrl && (
                       <div className="p-2 bg-white rounded-lg shadow-lg">
                         <img 
-                          src={certificate.qr_code_url} 
-                          alt="QR Code" 
+                          src={qrCodeUrl} 
+                          alt="QR Code untuk verifikasi sertifikat" 
                           className="w-20 h-20 md:w-24 md:h-24"
                         />
                       </div>
@@ -135,6 +172,40 @@ const CertificateVerify = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Share Section */}
+              <Card className="max-w-md mx-auto">
+                <CardHeader>
+                  <CardTitle className="text-center">Bagikan Sertifikat</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <p className="text-sm truncate flex-1 mr-2">
+                      {currentUrl}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={copyToClipboard}
+                      className="flex items-center gap-2"
+                    >
+                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      {copied ? "Tersalin!" : "Salin"}
+                    </Button>
+                  </div>
+                  
+                  <div className="flex flex-col items-center space-y-2">
+                    <p className="text-sm text-muted-foreground">Scan QR Code untuk membagikan</p>
+                    {qrCodeUrl && (
+                      <img 
+                        src={qrCodeUrl} 
+                        alt="QR Code untuk berbagi sertifikat" 
+                        className="w-32 h-32"
+                      />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Action Buttons */}
               <div className="flex gap-3 justify-center">
